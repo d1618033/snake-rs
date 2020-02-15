@@ -104,15 +104,27 @@ impl View {
         self.score_window.refresh();
     }
     fn get_input_from_user(&self) -> Option<UserInput> {
-        self.game_window.getch().map(|input| {
-            match input {
-                Input::Character('D') => UserInput::Direction(Direction::Left),
-                Input::Character('C') => UserInput::Direction(Direction::Right),
-                Input::Character('A') => UserInput::Direction(Direction::Up),
-                Input::Character('B') => UserInput::Direction(Direction::Down),
-                _ => UserInput::Other
+        let mut timeout = 70;
+        let step = 10;
+        loop {
+            match self.game_window.getch() {
+                Some(input) => {
+                    break Some(match input {
+                        Input::Character('D') => UserInput::Direction(Direction::Left),
+                        Input::Character('C') => UserInput::Direction(Direction::Right),
+                        Input::Character('A') => UserInput::Direction(Direction::Up),
+                        Input::Character('B') => UserInput::Direction(Direction::Down),
+                        _ => UserInput::Other
+                    })
+                },
+                None => ()
             }
-        })
+            thread::sleep(Duration::from_millis(step));
+            timeout -= step;
+            if timeout <= 0 {
+                break None
+            }
+        }
     }
 }
 
@@ -205,7 +217,6 @@ impl Controller {
             if self._collided_with_borders() {
                 break;
             }
-            thread::sleep(Duration::from_millis(80));
         }
         Ok(self.model.score)
     }

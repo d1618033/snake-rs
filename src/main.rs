@@ -67,42 +67,6 @@ impl Snake {
 }
 
 
-#[cfg(test)]
-mod tests {
-    // Note this useful idiom: importing names from outer (for mod tests) scope.
-    use super::*;
-
-    fn create_snake() -> Snake {
-        Snake::new(Point{x:10, y:5}, 3)
-    }
-
-    #[test]
-    fn test_snake_new() {
-        let snake = create_snake();
-        assert_eq!(snake.body, vec![Point{x:10, y:5}, Point{x:9, y:5}, Point{x:8, y:5}])
-    }
-
-    #[test]
-    fn test_snake_current_direction() {
-        let snake = create_snake();
-        assert_eq!(snake.get_current_direction(), Direction::Right);
-    }
-
-    #[test]
-    fn test_snake_move_in_direction() {
-        let mut snake = create_snake();
-        snake.move_in_direction(Direction::Up, false);
-        assert_eq!(snake.body, vec![Point{x:10, y:4}, Point{x:10, y:5}, Point{x:9, y:5}]);
-    }
-
-    #[test]
-    fn test_snake_move_in_direction_grow() {
-        let mut snake = create_snake();
-        snake.move_in_direction(Direction::Up, true);
-        assert_eq!(snake.body, vec![Point{x:10, y:4}, Point{x:10, y:5}, Point{x:9, y:5}, Point{x:8, y:5}]);
-    }
-}
-
 enum UserInput {
     Direction(Direction),
     Other,
@@ -283,4 +247,40 @@ fn main() -> Result<(), i32> {
 
     endwin();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    use super::*;
+
+    fn create_snake() -> Snake {
+        Snake::new(Point{x:10, y:5}, 3)
+    }
+
+    #[test]
+    fn test_snake_new() {
+        let snake = create_snake();
+        assert_eq!(snake.body, vec![Point{x:10, y:5}, Point{x:9, y:5}, Point{x:8, y:5}])
+    }
+
+    #[test]
+    fn test_snake_current_direction() {
+        let snake = create_snake();
+        assert_eq!(snake.get_current_direction(), Direction::Right);
+    }
+
+    #[test]
+    fn test_snake_move_in_direction() {
+        let mut snake = create_snake();
+        snake.move_in_direction(Direction::Up, false);
+        assert_eq!(snake.body, vec![Point{x:10, y:4}, Point{x:10, y:5}, Point{x:9, y:5}]);
+    }
+
+    #[test]
+    fn test_snake_move_in_direction_grow() {
+        let mut snake = create_snake();
+        snake.move_in_direction(Direction::Up, true);
+        assert_eq!(snake.body, vec![Point{x:10, y:4}, Point{x:10, y:5}, Point{x:9, y:5}, Point{x:8, y:5}]);
+    }
 }

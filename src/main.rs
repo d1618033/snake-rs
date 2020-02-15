@@ -7,7 +7,7 @@ use std::collections::VecDeque;
 use rand::prelude::ThreadRng;
 
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 struct Point {
     x: i32,
     y: i32,
@@ -166,6 +166,10 @@ impl Controller {
         let head = self.model.snake.body[0];
         head.x <= 0 || head.x >= self.view.get_max_x() || head.y <= 0 || head.y >= self.view.get_max_y()
     }
+    fn _collided_with_self(&self) -> bool {
+        let head = self.model.snake.body[0];
+        self.model.snake.body.iter().skip(1).any(|part| {*part == head})
+    }
     fn _ate_apple(&self) -> bool {
         let head = self.model.snake.body[0];
         head.x == self.model.apple.x && head.y == self.model.apple.y
@@ -205,7 +209,7 @@ impl Controller {
                 self.view.delete_snake_tail(tail)
             });
             self.view.display_snake_head(self.model.snake.body[0]);
-            if self._collided_with_borders() {
+            if self._collided_with_borders() || self._collided_with_self() {
                 break;
             }
         }

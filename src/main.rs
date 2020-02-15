@@ -113,6 +113,12 @@ impl View {
             }
         })
     }
+    fn get_max_x(&self) -> i32 {
+        self.game_window.get_max_x()
+    }
+    fn get_max_y(&self) -> i32 {
+        self.game_window.get_max_y()
+    }
 }
 
 struct Model {
@@ -149,7 +155,7 @@ impl Controller {
         Ok(Controller { view, model })
     }
     fn _generate_new_apple_point(&mut self) {
-        self.model.generate_new_apple_point(self.view.game_window.get_max_x(), self.view.game_window.get_max_y());
+        self.model.generate_new_apple_point(self.view.get_max_x(), self.view.get_max_y());
         self.view.display_apple(self.model.apple);
     }
     fn _update_score(&mut self, amount: i32) {
@@ -158,7 +164,7 @@ impl Controller {
     }
     fn _collided_with_borders(&self) -> bool {
         let head = self.model.snake.body[0];
-        head.x <= 0 || head.x >= self.view.game_window.get_max_x() || head.y <= 0 || head.y >= self.view.game_window.get_max_y()
+        head.x <= 0 || head.x >= self.view.get_max_x() || head.y <= 0 || head.y >= self.view.get_max_y()
     }
     fn _ate_apple(&self) -> bool {
         let head = self.model.snake.body[0];

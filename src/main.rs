@@ -150,46 +150,61 @@ impl Controller {
         let model = Model::new();
         Ok(Controller { view, model })
     }
-    fn run(&mut self) -> Result<i32, i32> {
+    fn _generate_new_apple_point(&mut self) {
         self.model.generate_new_apple_point(self.view.game_window.get_max_x(), self.view.game_window.get_max_y());
         self.view.display_apple(self.model.apple);
-        loop {
-            let current_direction = self.model.snake.get_current_direction();
-            let new_direction = match self.view.get_input_from_user() {
-                Some(user_input) => {
-                    match user_input {
-                        UserInput::Direction(direction_from_key) => {
-                            match (direction_from_key, current_direction) {
-                                (Direction::Left, Direction::Right) => Direction::Right,
-                                (Direction::Right, Direction::Left) => Direction::Left,
-                                (Direction::Up, Direction::Down) => Direction::Down,
-                                (Direction::Down, Direction::Up) => Direction::Up,
-                                (a, _) => a,
-                            }
-                        },
-                        UserInput::Other=> current_direction
-                    }
+    }
+    fn _update_score(&mut self, amount: i32) {
+        self.model.score += amount;
+        self.view.display_score(self.model.score);
+    }
+    fn _collided_with_borders(&self) -> bool {
+        let head = self.model.snake.body[0];
+        head.x <= 0 || head.x >= self.view.game_window.get_max_x() || head.y <= 0 || head.y >= self.view.game_window.get_max_y()
+    }
+    fn _ate_apple(&self) -> bool {
+        let head = self.model.snake.body[0];
+        head.x == self.model.apple.x && head.y == self.model.apple.y
+    }
+    fn _get_new_direction(&self) -> Direction {
+        let current_direction = self.model.snake.get_current_direction();
+        match self.view.get_input_from_user() {
+            Some(user_input) => {
+                match user_input {
+                    UserInput::Direction(direction_from_key) => {
+                        match (direction_from_key, current_direction) {
+                            (Direction::Left, Direction::Right) => Direction::Right,
+                            (Direction::Right, Direction::Left) => Direction::Left,
+                            (Direction::Up, Direction::Down) => Direction::Down,
+                            (Direction::Down, Direction::Up) => Direction::Up,
+                            (a, _) => a,
+                        }
+                    },
+                    UserInput::Other=> current_direction
                 }
-                None => current_direction,
-            };
-
-            let head = self.model.snake.body[0];
-            if head.x <= 0 || head.x >= self.view.game_window.get_max_x() || head.y <= 0 || head.y >= self.view.game_window.get_max_y() {
-                break;
             }
-            let grow = if head.x == self.model.apple.x && head.y == self.model.apple.y {
-                self.model.generate_new_apple_point(self.view.game_window.get_max_x(), self.view.game_window.get_max_y());
-                self.view.display_apple(self.model.apple);
-                self.model.score += 1;
-                self.view.display_score(self.model.score);
+            None => current_direction,
+        }
+
+    }
+    fn run(&mut self) -> Result<i32, i32> {
+        self._generate_new_apple_point();
+        loop {
+            let grow = if self._ate_apple() {
+                self._generate_new_apple_point();
+                self._update_score(1);
                 true
             } else {
                 false
             };
+            let new_direction = self._get_new_direction();
             self.model.snake.move_in_direction(new_direction, grow).map(|tail| {
                 self.view.delete_snake_tail(tail)
             });
             self.view.display_snake_head(self.model.snake.body[0]);
+            if self._collided_with_borders() {
+                break;
+            }
             thread::sleep(Duration::from_millis(80));
         }
         Ok(self.model.score)

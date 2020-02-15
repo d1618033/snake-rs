@@ -158,10 +158,6 @@ impl Model {
         let score = 0;
         Model { snake, apple, score, rng }
     }
-    fn new_from_snake_apple_and_score(snake: Snake, apple: Point, score: i32) -> Model {
-        let rng = rand::thread_rng();
-        Model { snake, apple, score, rng }
-    }
 }
 
 impl ModelTrait for Model {
@@ -398,14 +394,21 @@ mod tests {
         model: Model,
     }
 
+    impl Model {
+        fn new_from_snake_apple_and_score(snake: Snake, apple: Point, score: i32) -> Model {
+            let rng = rand::thread_rng();
+            Model { snake, apple, score, rng }
+        }
+    }
+
     impl MockModel {
         fn new(snake: Snake, apple: Point, score: i32) -> MockModel {
-            MockModel{model: Model::new_from_snake_apple_and_score(snake, apple, score)}
+            MockModel { model: Model::new_from_snake_apple_and_score(snake, apple, score) }
         }
     }
 
     impl ModelTrait for MockModel {
-        fn generate_new_apple_point(&mut self, max_x: i32, max_y: i32) {}
+        fn generate_new_apple_point(&mut self, _max_x: i32, _max_y: i32) {}
 
         fn get_apple(&self) -> &Point {
             self.model.get_apple()
@@ -432,7 +435,6 @@ mod tests {
     fn test_controller() {
         let snake = Snake::new(Point { x: 4, y: 4 }, 3);
         let apple = Point { x: 4, y: 2 };
-        let rng = rand::thread_rng();
         let model = MockModel::new(snake, apple, 0);
         let mut user_inputs: VecDeque<UserInput> = VecDeque::new();
         user_inputs.push_back(UserInput::Direction(Direction::Up));
@@ -442,17 +444,23 @@ mod tests {
             40,
         );
         let mut controller = Controller { view, model };
-        controller.run();
-        assert_eq!(controller.model.get_score(), 1);
-        assert_eq!(controller.model.get_snake().body.len(), 4);
-        assert_eq!(controller.view.snake_paints, vec![
-            SnakePaint::Remove(Point { x: 2, y: 4 }),
-            SnakePaint::Add(Point { x: 4, y: 3 }),
-            SnakePaint::Remove(Point { x: 3, y: 4 }),
-            SnakePaint::Add(Point { x: 4, y: 2 }),
-            SnakePaint::Add(Point { x: 4, y: 1 }),
-            SnakePaint::Remove(Point { x: 4, y: 4 }),
-            SnakePaint::Add(Point { x: 4, y: 0 }),
-        ])
+        let result = controller.run();
+        match result {
+            Ok(res) => {
+                assert_eq!(controller.model.get_score(), 1);
+                assert_eq!(controller.model.get_snake().body.len(), 4);
+                assert_eq!(controller.view.snake_paints, vec![
+                    SnakePaint::Remove(Point { x: 2, y: 4 }),
+                    SnakePaint::Add(Point { x: 4, y: 3 }),
+                    SnakePaint::Remove(Point { x: 3, y: 4 }),
+                    SnakePaint::Add(Point { x: 4, y: 2 }),
+                    SnakePaint::Add(Point { x: 4, y: 1 }),
+                    SnakePaint::Remove(Point { x: 4, y: 4 }),
+                    SnakePaint::Add(Point { x: 4, y: 0 }),
+                ]);
+                assert_eq!(res, 1);
+            },
+            Err(res) => panic!("Got result: {}", res)
+        }
     }
 }

@@ -75,21 +75,23 @@ fn generate_random_point(rng: &mut ThreadRng, window: &Window) -> Point {
     Point { x, y }
 }
 
-fn game(window: &Window) -> i32 {
+fn game(window: &Window) -> Result<i32, i32> {
     curs_set(0);
-    window.nodelay(true);
     window.clear();
+    let score_window = window.subwin(1, window.get_max_x(), 0, 0)?;
+    score_window.mvaddstr(0, 0, "Score: 0");
+    score_window.refresh();
+    let game_window = window.subwin(window.get_max_y() - 1, window.get_max_x(), 1, 0)?;
+    game_window.nodelay(true);
     let mut snake: Snake = Snake::new(Point { x: 10, y: 10 }, 3);
     let mut rng = rand::thread_rng();
-    let mut apple = generate_random_point(&mut rng, &window);
+    let mut apple = generate_random_point(&mut rng, &game_window);
     let mut score = 0;
-
-    window.mvaddch(apple.y, apple.x, '*');
+    game_window.mvaddch(apple.y, apple.x, '*');
     loop {
         let current_direction = snake.get_current_direction();
-        let direction_from_key = match window.getch() {
+        let direction_from_key = match game_window.getch() {
             Some(input) => {
-//                window.mvaddstr(0, 0, format!("{:?}", input));
                 match input {
                     Input::Character('D') => Direction::Left,
                     Input::Character('C') => Direction::Right,
@@ -110,32 +112,34 @@ fn game(window: &Window) -> i32 {
         };
 
         let head = snake.body[0];
-        if head.x <= 0 || head.x >= window.get_max_x() || head.y <= 0 || head.y >= window.get_max_y() {
+        if head.x <= 0 || head.x >= game_window.get_max_x() || head.y <= 0 || head.y >= game_window.get_max_y() {
             break;
         }
         let grow = if head.x == apple.x && head.y == apple.y {
-            apple = generate_random_point(&mut rng, &window);
-            window.mvaddch(apple.y, apple.x, '*');
+            apple = generate_random_point(&mut rng, &game_window);
+            game_window.mvaddch(apple.y, apple.x, '*');
             score += 1;
+            score_window.mvaddstr(0, 7, format!("{}", score));
+            score_window.refresh();
             true
         } else {
             false
         };
         snake.move_in_direction(new_direction, grow).map(|tail| {
-            window.mvaddch(tail.y, tail.x, ' ')
+            game_window.mvaddch(tail.y, tail.x, ' ')
         });
-        window.mvaddch(snake.body[0].y, snake.body[0].x, '#');
+        game_window.mvaddch(snake.body[0].y, snake.body[0].x, '#');
         thread::sleep(Duration::from_millis(80));
     }
-    score
+    Ok(score)
 }
 
-fn main() {
+fn main() -> Result<(), i32> {
     let window = initscr();
     noecho();
     window.refresh();
     'outer: loop {
-        let score = game(&window);
+        let score = game(&window)?;
         window.mvaddstr(window.get_max_y() / 2, window.get_max_x() / 2 - 20, format!("Game over! Your score is: {}", score));
         window.mvaddstr(window.get_max_y() / 2 + 2, window.get_max_x() / 2 - 20, "Would you like to play again? (y/n)");
         window.nodelay(false);
@@ -154,4 +158,5 @@ fn main() {
     }
 
     endwin();
+    Ok(())
 }

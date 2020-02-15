@@ -69,69 +69,123 @@ impl Snake {
 }
 
 
-fn generate_random_point(rng: &mut ThreadRng, window: &Window) -> Point {
-    let x = rng.gen_range(1, window.get_max_x() - 2);
-    let y = rng.gen_range(1, window.get_max_y() - 2);
-    Point { x, y }
+struct View {
+    score_window: Window,
+    game_window: Window,
+}
+
+impl View {
+    fn new(window: &Window) -> Result<View, i32> {
+        curs_set(0);
+        window.clear();
+        let score_window = window.subwin(1, window.get_max_x(), 0, 0)?;
+        score_window.mvaddstr(0, 0, "Score: 0");
+        score_window.refresh();
+        let game_window = window.subwin(window.get_max_y() - 1, window.get_max_x(), 1, 0)?;
+        game_window.nodelay(true);
+        Ok(View { score_window, game_window })
+    }
+    fn display_apple(&self, apple: Point) {
+        self.game_window.mvaddch(apple.y, apple.x, '*');
+    }
+    fn display_snake_head(&self, snake_head: Point) {
+        self.game_window.mvaddch(snake_head.y, snake_head.x, '#');
+    }
+    fn delete_snake_tail(&self, snake_tail: Point) {
+        self.game_window.mvaddch(snake_tail.y, snake_tail.x, ' ');
+    }
+    fn display_score(&self, score: i32) {
+        self.score_window.mvaddstr(0, 7, format!("{}", score));
+        self.score_window.refresh();
+    }
+}
+
+
+struct Model {
+    snake: Snake,
+    apple: Point,
+    score: i32,
+    rng: ThreadRng,
+}
+
+impl Model {
+    fn new() -> Model {
+        let snake: Snake = Snake::new(Point { x: 10, y: 10 }, 3);
+        let rng = rand::thread_rng();
+        let apple = Point { x: 0, y: 0 };
+        let score = 0;
+        Model { snake, apple, score, rng }
+    }
+    fn generate_new_apple_point(&mut self, max_x: i32, max_y: i32) {
+        let x = self.rng.gen_range(1, max_x - 2);
+        let y = self.rng.gen_range(1, max_y - 2);
+        self.apple = Point { x, y }
+    }
+}
+
+struct Controller {
+    view: View,
+    model: Model,
+}
+
+impl Controller {
+    fn new(window: &Window) -> Result<Controller, i32> {
+        let view = View::new(&window)?;
+        let model = Model::new();
+        Ok(Controller { view, model })
+    }
+    fn run(&mut self) -> Result<i32, i32> {
+        self.model.generate_new_apple_point(self.view.game_window.get_max_x(), self.view.game_window.get_max_y());
+        self.view.display_apple(self.model.apple);
+        loop {
+            let current_direction = self.model.snake.get_current_direction();
+            let direction_from_key = match self.view.game_window.getch() {
+                Some(input) => {
+                    match input {
+                        Input::Character('D') => Direction::Left,
+                        Input::Character('C') => Direction::Right,
+                        Input::Character('A') => Direction::Up,
+                        Input::Character('B') => Direction::Down,
+                        Input::KeyAbort => break,
+                        _ => current_direction
+                    }
+                }
+                None => current_direction,
+            };
+            let new_direction = match (direction_from_key, self.model.snake.get_current_direction()) {
+                (Direction::Left, Direction::Right) => Direction::Right,
+                (Direction::Right, Direction::Left) => Direction::Left,
+                (Direction::Up, Direction::Down) => Direction::Down,
+                (Direction::Down, Direction::Up) => Direction::Up,
+                (a, _) => a,
+            };
+
+            let head = self.model.snake.body[0];
+            if head.x <= 0 || head.x >= self.view.game_window.get_max_x() || head.y <= 0 || head.y >= self.view.game_window.get_max_y() {
+                break;
+            }
+            let grow = if head.x == self.model.apple.x && head.y == self.model.apple.y {
+                self.model.generate_new_apple_point(self.view.game_window.get_max_x(), self.view.game_window.get_max_y());
+                self.view.display_apple(self.model.apple);
+                self.model.score += 1;
+                self.view.display_score(self.model.score);
+                true
+            } else {
+                false
+            };
+            self.model.snake.move_in_direction(new_direction, grow).map(|tail| {
+                self.view.delete_snake_tail(tail)
+            });
+            self.view.display_snake_head(self.model.snake.body[0]);
+            thread::sleep(Duration::from_millis(80));
+        }
+        Ok(self.model.score)
+    }
 }
 
 fn game(window: &Window) -> Result<i32, i32> {
-    curs_set(0);
-    window.clear();
-    let score_window = window.subwin(1, window.get_max_x(), 0, 0)?;
-    score_window.mvaddstr(0, 0, "Score: 0");
-    score_window.refresh();
-    let game_window = window.subwin(window.get_max_y() - 1, window.get_max_x(), 1, 0)?;
-    game_window.nodelay(true);
-    let mut snake: Snake = Snake::new(Point { x: 10, y: 10 }, 3);
-    let mut rng = rand::thread_rng();
-    let mut apple = generate_random_point(&mut rng, &game_window);
-    let mut score = 0;
-    game_window.mvaddch(apple.y, apple.x, '*');
-    loop {
-        let current_direction = snake.get_current_direction();
-        let direction_from_key = match game_window.getch() {
-            Some(input) => {
-                match input {
-                    Input::Character('D') => Direction::Left,
-                    Input::Character('C') => Direction::Right,
-                    Input::Character('A') => Direction::Up,
-                    Input::Character('B') => Direction::Down,
-                    Input::KeyAbort => break,
-                    _ => current_direction
-                }
-            }
-            None => current_direction,
-        };
-        let new_direction = match (direction_from_key, snake.get_current_direction()) {
-            (Direction::Left, Direction::Right) => Direction::Right,
-            (Direction::Right, Direction::Left) => Direction::Left,
-            (Direction::Up, Direction::Down) => Direction::Down,
-            (Direction::Down, Direction::Up) => Direction::Up,
-            (a, _) => a,
-        };
-
-        let head = snake.body[0];
-        if head.x <= 0 || head.x >= game_window.get_max_x() || head.y <= 0 || head.y >= game_window.get_max_y() {
-            break;
-        }
-        let grow = if head.x == apple.x && head.y == apple.y {
-            apple = generate_random_point(&mut rng, &game_window);
-            game_window.mvaddch(apple.y, apple.x, '*');
-            score += 1;
-            score_window.mvaddstr(0, 7, format!("{}", score));
-            score_window.refresh();
-            true
-        } else {
-            false
-        };
-        snake.move_in_direction(new_direction, grow).map(|tail| {
-            game_window.mvaddch(tail.y, tail.x, ' ')
-        });
-        game_window.mvaddch(snake.body[0].y, snake.body[0].x, '#');
-        thread::sleep(Duration::from_millis(80));
-    }
-    Ok(score)
+    let mut controller = Controller::new(&window)?;
+    controller.run()
 }
 
 fn main() -> Result<(), i32> {

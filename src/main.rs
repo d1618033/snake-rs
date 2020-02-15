@@ -69,6 +69,11 @@ impl Snake {
 }
 
 
+enum UserInput {
+    Direction(Direction),
+    Other,
+}
+
 struct View {
     score_window: Window,
     game_window: Window,
@@ -97,6 +102,17 @@ impl View {
     fn display_score(&self, score: i32) {
         self.score_window.mvaddstr(0, 7, format!("{}", score));
         self.score_window.refresh();
+    }
+    fn get_input_from_user(&self) -> Option<UserInput> {
+        self.game_window.getch().map(|input| {
+            match input {
+                Input::Character('D') => UserInput::Direction(Direction::Left),
+                Input::Character('C') => UserInput::Direction(Direction::Right),
+                Input::Character('A') => UserInput::Direction(Direction::Up),
+                Input::Character('B') => UserInput::Direction(Direction::Down),
+                _ => UserInput::Other
+            }
+        })
     }
 }
 
@@ -139,25 +155,22 @@ impl Controller {
         self.view.display_apple(self.model.apple);
         loop {
             let current_direction = self.model.snake.get_current_direction();
-            let direction_from_key = match self.view.game_window.getch() {
-                Some(input) => {
-                    match input {
-                        Input::Character('D') => Direction::Left,
-                        Input::Character('C') => Direction::Right,
-                        Input::Character('A') => Direction::Up,
-                        Input::Character('B') => Direction::Down,
-                        Input::KeyAbort => break,
-                        _ => current_direction
+            let new_direction = match self.view.get_input_from_user() {
+                Some(user_input) => {
+                    match user_input {
+                        UserInput::Direction(direction_from_key) => {
+                            match (direction_from_key, current_direction) {
+                                (Direction::Left, Direction::Right) => Direction::Right,
+                                (Direction::Right, Direction::Left) => Direction::Left,
+                                (Direction::Up, Direction::Down) => Direction::Down,
+                                (Direction::Down, Direction::Up) => Direction::Up,
+                                (a, _) => a,
+                            }
+                        },
+                        UserInput::Other=> current_direction
                     }
                 }
                 None => current_direction,
-            };
-            let new_direction = match (direction_from_key, self.model.snake.get_current_direction()) {
-                (Direction::Left, Direction::Right) => Direction::Right,
-                (Direction::Right, Direction::Left) => Direction::Left,
-                (Direction::Up, Direction::Down) => Direction::Down,
-                (Direction::Down, Direction::Up) => Direction::Up,
-                (a, _) => a,
             };
 
             let head = self.model.snake.body[0];

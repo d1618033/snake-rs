@@ -51,7 +51,7 @@ impl Snake {
             _ => panic!("Unknown direction")
         };
     }
-    fn move_in_direction(&mut self, direction: Direction, window: &Window, grow: bool) -> Option<()> {
+    fn move_in_direction(&mut self, direction: Direction, grow: bool) -> Option<Point> {
         let head = self.body[0];
         let new_head = match direction {
             Direction::Up => Point { x: head.x, y: head.y - 1 },
@@ -60,12 +60,11 @@ impl Snake {
             Direction::Right => Point { x: head.x + 1, y: head.y },
         };
         self.body.push_front(new_head);
-        if !grow {
-            let tail = self.body.pop_back()?;
-            window.mvaddch(tail.y, tail.x, ' ');
+        if grow {
+            None
+        } else {
+            self.body.pop_back()
         }
-        window.mvaddch(new_head.y, new_head.x, '#');
-        Some(())
     }
 }
 
@@ -119,7 +118,10 @@ fn game(window: &Window) {
         } else {
             false
         };
-        snake.move_in_direction(new_direction, &window, grow);
+        snake.move_in_direction(new_direction, grow).map(|tail| {
+            window.mvaddch(tail.y, tail.x, ' ')
+        });
+        window.mvaddch(snake.body[0].y, snake.body[0].x, '#');
         thread::sleep(Duration::from_millis(80));
     }
 }

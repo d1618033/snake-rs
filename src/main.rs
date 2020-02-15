@@ -86,6 +86,7 @@ impl View {
         score_window.refresh();
         let game_window = window.subwin(window.get_max_y() - 1, window.get_max_x(), 1, 0)?;
         game_window.timeout(100);
+        game_window.draw_box(0, 0);
         Ok(View { score_window, game_window })
     }
     fn display_apple(&self, apple: Point) {

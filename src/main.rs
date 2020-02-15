@@ -7,7 +7,7 @@ use std::collections::VecDeque;
 use rand::prelude::ThreadRng;
 
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 struct Point {
     x: i32,
     y: i32,
@@ -72,6 +72,16 @@ enum UserInput {
     Other,
 }
 
+trait ViewTrait {
+    fn display_apple(&mut self, apple: &Point);
+    fn display_snake_head(&mut self, snake_head: &Point);
+    fn delete_snake_tail(&mut self, snake_tail: &Point);
+    fn display_score(&mut self, score: i32);
+    fn get_input_from_user(&mut self) -> Option<UserInput>;
+    fn get_max_x(&self) -> i32;
+    fn get_max_y(&self) -> i32;
+}
+
 struct View {
     score_window: Window,
     game_window: Window,
@@ -89,20 +99,23 @@ impl View {
         game_window.draw_box(0, 0);
         Ok(View { score_window, game_window })
     }
-    fn display_apple(&self, apple: &Point) {
+}
+
+impl ViewTrait for View {
+    fn display_apple(&mut self, apple: &Point) {
         self.game_window.mvaddch(apple.y, apple.x, '*');
     }
-    fn display_snake_head(&self, snake_head: &Point) {
+    fn display_snake_head(&mut self, snake_head: &Point) {
         self.game_window.mvaddch(snake_head.y, snake_head.x, '#');
     }
-    fn delete_snake_tail(&self, snake_tail: &Point) {
+    fn delete_snake_tail(&mut self, snake_tail: &Point) {
         self.game_window.mvaddch(snake_tail.y, snake_tail.x, ' ');
     }
-    fn display_score(&self, score: i32) {
+    fn display_score(&mut self, score: i32) {
         self.score_window.mvaddstr(0, 7, format!("{}", score));
         self.score_window.refresh();
     }
-    fn get_input_from_user(&self) -> Option<UserInput> {
+    fn get_input_from_user(&mut self) -> Option<UserInput> {
         self.game_window.getch().map(|input| {
             match input {
                 Input::Character('D') => UserInput::Direction(Direction::Left),
@@ -128,6 +141,15 @@ struct Model {
     rng: ThreadRng,
 }
 
+trait ModelTrait {
+    fn generate_new_apple_point(&mut self, max_x: i32, max_y: i32);
+    fn get_apple(&self) -> &Point;
+    fn get_snake(&self) -> &Snake;
+    fn get_score(&self) -> i32;
+    fn update_score(&mut self, amount: i32);
+    fn move_in_direction(&mut self, direction: Direction, grow: bool) -> Option<Point>;
+}
+
 impl Model {
     fn new() -> Model {
         let snake: Snake = Snake::new(Point { x: 10, y: 10 }, 3);
@@ -136,46 +158,76 @@ impl Model {
         let score = 0;
         Model { snake, apple, score, rng }
     }
+    fn new_from_snake_apple_and_score(snake: Snake, apple: Point, score: i32) -> Model {
+        let rng = rand::thread_rng();
+        Model { snake, apple, score, rng }
+    }
+}
+
+impl ModelTrait for Model {
     fn generate_new_apple_point(&mut self, max_x: i32, max_y: i32) {
         let x = self.rng.gen_range(1, max_x - 2);
         let y = self.rng.gen_range(1, max_y - 2);
         self.apple = Point { x, y }
     }
+
+    fn get_apple(&self) -> &Point {
+        &self.apple
+    }
+
+    fn get_snake(&self) -> &Snake {
+        &self.snake
+    }
+
+    fn get_score(&self) -> i32 {
+        self.score
+    }
+
+    fn update_score(&mut self, amount: i32) {
+        self.score += amount;
+    }
+
+    fn move_in_direction(&mut self, direction: Direction, grow: bool) -> Option<Point> {
+        self.snake.move_in_direction(direction, grow)
+    }
 }
 
-struct Controller {
-    view: View,
-    model: Model,
+struct Controller<V: ViewTrait, M: ModelTrait> {
+    view: V,
+    model: M,
 }
 
-impl Controller {
-    fn new(window: &Window) -> Result<Controller, i32> {
+impl Controller<View, Model> {
+    fn new(window: &Window) -> Result<Controller<View, Model>, i32> {
         let view = View::new(&window)?;
         let model = Model::new();
         Ok(Controller { view, model })
     }
+}
+
+impl<V: ViewTrait, M: ModelTrait> Controller<V, M> {
     fn _generate_new_apple_point(&mut self) {
         self.model.generate_new_apple_point(self.view.get_max_x(), self.view.get_max_y());
-        self.view.display_apple(&self.model.apple);
+        self.view.display_apple(&self.model.get_apple());
     }
     fn _update_score(&mut self, amount: i32) {
-        self.model.score += amount;
-        self.view.display_score(self.model.score);
+        self.model.update_score(amount);
+        self.view.display_score(self.model.get_score());
     }
     fn _collided_with_borders(&self) -> bool {
-        let head = &self.model.snake.body[0];
+        let head = &self.model.get_snake().body[0];
         head.x <= 0 || head.x >= self.view.get_max_x() || head.y <= 0 || head.y >= self.view.get_max_y()
     }
     fn _collided_with_self(&self) -> bool {
-        let head = &self.model.snake.body[0];
-        self.model.snake.body.iter().skip(1).any(|part| {*part == *head})
+        let head = &self.model.get_snake().body[0];
+        self.model.get_snake().body.iter().skip(1).any(|part| { *part == *head })
     }
     fn _ate_apple(&self) -> bool {
-        let head = &self.model.snake.body[0];
-        head.x == self.model.apple.x && head.y == self.model.apple.y
+        let head = &self.model.get_snake().body[0];
+        head.x == self.model.get_apple().x && head.y == self.model.get_apple().y
     }
-    fn _get_new_direction(&self) -> Direction {
-        let current_direction = self.model.snake.get_current_direction();
+    fn _get_new_direction(&mut self) -> Direction {
+        let current_direction = self.model.get_snake().get_current_direction();
         match self.view.get_input_from_user() {
             Some(user_input) => {
                 match user_input {
@@ -208,12 +260,12 @@ impl Controller {
                 break;
             }
             let new_direction = self._get_new_direction();
-            self.model.snake.move_in_direction(new_direction, grow).map(|tail| {
+            self.model.move_in_direction(new_direction, grow).map(|tail| {
                 self.view.delete_snake_tail(&tail)
             });
-            self.view.display_snake_head(&self.model.snake.body[0]);
+            self.view.display_snake_head(&self.model.get_snake().body[0]);
         }
-        Ok(self.model.score)
+        Ok(self.model.get_score())
     }
 }
 
@@ -255,13 +307,13 @@ mod tests {
     use super::*;
 
     fn create_snake() -> Snake {
-        Snake::new(Point{x:10, y:5}, 3)
+        Snake::new(Point { x: 10, y: 5 }, 3)
     }
 
     #[test]
     fn test_snake_new() {
         let snake = create_snake();
-        assert_eq!(snake.body, vec![Point{x:10, y:5}, Point{x:9, y:5}, Point{x:8, y:5}])
+        assert_eq!(snake.body, vec![Point { x: 10, y: 5 }, Point { x: 9, y: 5 }, Point { x: 8, y: 5 }])
     }
 
     #[test]
@@ -274,13 +326,133 @@ mod tests {
     fn test_snake_move_in_direction() {
         let mut snake = create_snake();
         snake.move_in_direction(Direction::Up, false);
-        assert_eq!(snake.body, vec![Point{x:10, y:4}, Point{x:10, y:5}, Point{x:9, y:5}]);
+        assert_eq!(snake.body, vec![Point { x: 10, y: 4 }, Point { x: 10, y: 5 }, Point { x: 9, y: 5 }]);
     }
 
     #[test]
     fn test_snake_move_in_direction_grow() {
         let mut snake = create_snake();
         snake.move_in_direction(Direction::Up, true);
-        assert_eq!(snake.body, vec![Point{x:10, y:4}, Point{x:10, y:5}, Point{x:9, y:5}, Point{x:8, y:5}]);
+        assert_eq!(snake.body, vec![Point { x: 10, y: 4 }, Point { x: 10, y: 5 }, Point { x: 9, y: 5 }, Point { x: 8, y: 5 }]);
+    }
+
+    #[derive(Debug, PartialEq)]
+    enum SnakePaint {
+        Add(Point),
+        Remove(Point),
+    }
+
+    struct MockView {
+        snake_paints: Vec<SnakePaint>,
+        apple_paints: Vec<Point>,
+        scores: Vec<i32>,
+        user_inputs: VecDeque<UserInput>,
+        max_x: i32,
+        max_y: i32,
+    }
+
+    impl MockView {
+        fn new(user_inputs: VecDeque<UserInput>, max_x: i32, max_y: i32) -> MockView {
+            MockView {
+                snake_paints: Vec::new(),
+                apple_paints: Vec::new(),
+                scores: Vec::new(),
+                user_inputs,
+                max_x,
+                max_y,
+            }
+        }
+    }
+
+    impl ViewTrait for MockView {
+        fn display_apple(&mut self, apple: &Point) {
+            self.apple_paints.push(apple.clone());
+        }
+
+        fn display_snake_head(&mut self, snake_head: &Point) {
+            self.snake_paints.push(SnakePaint::Add(snake_head.clone()));
+        }
+
+        fn delete_snake_tail(&mut self, snake_tail: &Point) {
+            self.snake_paints.push(SnakePaint::Remove(snake_tail.clone()));
+        }
+
+        fn display_score(&mut self, score: i32) {
+            self.scores.push(score);
+        }
+
+        fn get_input_from_user(&mut self) -> Option<UserInput> {
+            return self.user_inputs.pop_front();
+        }
+
+        fn get_max_x(&self) -> i32 {
+            self.max_x
+        }
+
+        fn get_max_y(&self) -> i32 {
+            self.max_y
+        }
+    }
+
+    struct MockModel {
+        model: Model,
+    }
+
+    impl MockModel {
+        fn new(snake: Snake, apple: Point, score: i32) -> MockModel {
+            MockModel{model: Model::new_from_snake_apple_and_score(snake, apple, score)}
+        }
+    }
+
+    impl ModelTrait for MockModel {
+        fn generate_new_apple_point(&mut self, max_x: i32, max_y: i32) {}
+
+        fn get_apple(&self) -> &Point {
+            self.model.get_apple()
+        }
+
+        fn get_snake(&self) -> &Snake {
+            self.model.get_snake()
+        }
+
+        fn get_score(&self) -> i32 {
+            self.model.get_score()
+        }
+
+        fn update_score(&mut self, amount: i32) {
+            self.model.update_score(amount)
+        }
+
+        fn move_in_direction(&mut self, direction: Direction, grow: bool) -> Option<Point> {
+            self.model.move_in_direction(direction, grow)
+        }
+    }
+
+    #[test]
+    fn test_controller() {
+        let snake = Snake::new(Point { x: 4, y: 4 }, 3);
+        let apple = Point { x: 4, y: 2 };
+        let rng = rand::thread_rng();
+        let model = MockModel::new(snake, apple, 0);
+        let mut user_inputs: VecDeque<UserInput> = VecDeque::new();
+        user_inputs.push_back(UserInput::Direction(Direction::Up));
+        let view = MockView::new(
+            user_inputs,
+            40,
+            40,
+        );
+        let mut controller = Controller { view, model };
+        controller.run();
+        assert_eq!(controller.model.get_score(), 1);
+        assert_eq!(controller.model.get_snake().body.len(), 4);
+        assert_eq!(controller.view.snake_paints, vec![
+            SnakePaint::Remove(Point { x: 2, y: 4 }),
+            SnakePaint::Add(Point { x: 4, y: 3 }),
+            SnakePaint::Remove(Point { x: 3, y: 4 }),
+            SnakePaint::Add(Point { x: 4, y: 2 }),
+            SnakePaint::Add(Point { x: 4, y: 1 }),
+            SnakePaint::Remove(Point { x: 4, y: 4 }),
+            SnakePaint::Add(Point { x: 4, y: 0 }),
+        ])
     }
 }

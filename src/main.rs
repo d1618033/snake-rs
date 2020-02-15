@@ -7,7 +7,7 @@ use std::collections::VecDeque;
 use rand::prelude::ThreadRng;
 
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(PartialEq)]
 struct Point {
     x: i32,
     y: i32,
@@ -27,15 +27,14 @@ enum Direction {
 impl Snake {
     fn new(head: Point, n: usize) -> Snake {
         let mut body: VecDeque<Point> = VecDeque::new();
-        body.push_back(head);
-        for i in 1..n {
+        for i in 0..n {
             body.push_back(Point { x: head.x - (i as i32), y: head.y })
         }
         Snake { body }
     }
     fn get_current_direction(&self) -> Direction {
-        let head = self.body[0];
-        let second = self.body[1];
+        let head = &self.body[0];
+        let second = &self.body[1];
         return match head.x - second.x {
             1 => Direction::Right,
             -1 => Direction::Left,
@@ -50,7 +49,7 @@ impl Snake {
         };
     }
     fn move_in_direction(&mut self, direction: Direction, grow: bool) -> Option<Point> {
-        let head = self.body[0];
+        let head = &self.body[0];
         let new_head = match direction {
             Direction::Up => Point { x: head.x, y: head.y - 1 },
             Direction::Down => Point { x: head.x, y: head.y + 1 },
@@ -89,13 +88,13 @@ impl View {
         game_window.draw_box(0, 0);
         Ok(View { score_window, game_window })
     }
-    fn display_apple(&self, apple: Point) {
+    fn display_apple(&self, apple: &Point) {
         self.game_window.mvaddch(apple.y, apple.x, '*');
     }
-    fn display_snake_head(&self, snake_head: Point) {
+    fn display_snake_head(&self, snake_head: &Point) {
         self.game_window.mvaddch(snake_head.y, snake_head.x, '#');
     }
-    fn delete_snake_tail(&self, snake_tail: Point) {
+    fn delete_snake_tail(&self, snake_tail: &Point) {
         self.game_window.mvaddch(snake_tail.y, snake_tail.x, ' ');
     }
     fn display_score(&self, score: i32) {
@@ -156,22 +155,22 @@ impl Controller {
     }
     fn _generate_new_apple_point(&mut self) {
         self.model.generate_new_apple_point(self.view.get_max_x(), self.view.get_max_y());
-        self.view.display_apple(self.model.apple);
+        self.view.display_apple(&self.model.apple);
     }
     fn _update_score(&mut self, amount: i32) {
         self.model.score += amount;
         self.view.display_score(self.model.score);
     }
     fn _collided_with_borders(&self) -> bool {
-        let head = self.model.snake.body[0];
+        let head = &self.model.snake.body[0];
         head.x <= 0 || head.x >= self.view.get_max_x() || head.y <= 0 || head.y >= self.view.get_max_y()
     }
     fn _collided_with_self(&self) -> bool {
-        let head = self.model.snake.body[0];
-        self.model.snake.body.iter().skip(1).any(|part| {*part == head})
+        let head = &self.model.snake.body[0];
+        self.model.snake.body.iter().skip(1).any(|part| {*part == *head})
     }
     fn _ate_apple(&self) -> bool {
-        let head = self.model.snake.body[0];
+        let head = &self.model.snake.body[0];
         head.x == self.model.apple.x && head.y == self.model.apple.y
     }
     fn _get_new_direction(&self) -> Direction {
@@ -206,9 +205,9 @@ impl Controller {
             };
             let new_direction = self._get_new_direction();
             self.model.snake.move_in_direction(new_direction, grow).map(|tail| {
-                self.view.delete_snake_tail(tail)
+                self.view.delete_snake_tail(&tail)
             });
-            self.view.display_snake_head(self.model.snake.body[0]);
+            self.view.display_snake_head(&self.model.snake.body[0]);
             if self._collided_with_borders() || self._collided_with_self() {
                 break;
             }

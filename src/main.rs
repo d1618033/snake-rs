@@ -4,8 +4,6 @@ extern crate rand;
 use pancurses::{initscr, endwin, Input, noecho, Window, curs_set};
 use rand::Rng;
 use std::collections::VecDeque;
-use std::thread;
-use std::time::Duration;
 use rand::prelude::ThreadRng;
 
 
@@ -87,7 +85,7 @@ impl View {
         score_window.mvaddstr(0, 0, "Score: 0");
         score_window.refresh();
         let game_window = window.subwin(window.get_max_y() - 1, window.get_max_x(), 1, 0)?;
-        game_window.nodelay(true);
+        game_window.timeout(100);
         Ok(View { score_window, game_window })
     }
     fn display_apple(&self, apple: Point) {
@@ -104,30 +102,17 @@ impl View {
         self.score_window.refresh();
     }
     fn get_input_from_user(&self) -> Option<UserInput> {
-        let mut timeout = 70;
-        let step = 10;
-        loop {
-            match self.game_window.getch() {
-                Some(input) => {
-                    break Some(match input {
-                        Input::Character('D') => UserInput::Direction(Direction::Left),
-                        Input::Character('C') => UserInput::Direction(Direction::Right),
-                        Input::Character('A') => UserInput::Direction(Direction::Up),
-                        Input::Character('B') => UserInput::Direction(Direction::Down),
-                        _ => UserInput::Other
-                    })
-                },
-                None => ()
+        self.game_window.getch().map(|input| {
+            match input {
+                Input::Character('D') => UserInput::Direction(Direction::Left),
+                Input::Character('C') => UserInput::Direction(Direction::Right),
+                Input::Character('A') => UserInput::Direction(Direction::Up),
+                Input::Character('B') => UserInput::Direction(Direction::Down),
+                _ => UserInput::Other,
             }
-            thread::sleep(Duration::from_millis(step));
-            timeout -= step;
-            if timeout <= 0 {
-                break None
-            }
-        }
+        })
     }
 }
-
 
 struct Model {
     snake: Snake,
@@ -191,13 +176,12 @@ impl Controller {
                             (Direction::Down, Direction::Up) => Direction::Up,
                             (a, _) => a,
                         }
-                    },
-                    UserInput::Other=> current_direction
+                    }
+                    UserInput::Other => current_direction
                 }
             }
             None => current_direction,
         }
-
     }
     fn run(&mut self) -> Result<i32, i32> {
         self._generate_new_apple_point();

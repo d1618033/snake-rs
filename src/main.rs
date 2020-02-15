@@ -72,16 +72,18 @@ impl Snake {
 fn generate_random_point(rng: &mut ThreadRng, window: &Window) -> Point {
     let x = rng.gen_range(1, window.get_max_x() - 2);
     let y = rng.gen_range(1, window.get_max_y() - 2);
-    Point{x, y}
+    Point { x, y }
 }
 
-fn game(window: &Window) {
+fn game(window: &Window) -> i32 {
     curs_set(0);
     window.nodelay(true);
     window.clear();
     let mut snake: Snake = Snake::new(Point { x: 10, y: 10 }, 3);
     let mut rng = rand::thread_rng();
     let mut apple = generate_random_point(&mut rng, &window);
+    let mut score = 0;
+
     window.mvaddch(apple.y, apple.x, '*');
     loop {
         let current_direction = snake.get_current_direction();
@@ -100,11 +102,11 @@ fn game(window: &Window) {
             None => current_direction,
         };
         let new_direction = match (direction_from_key, snake.get_current_direction()) {
-          (Direction::Left, Direction::Right) => Direction::Right,
-          (Direction::Right, Direction::Left) => Direction::Left,
-          (Direction::Up, Direction::Down) => Direction::Down,
-          (Direction::Down, Direction::Up) => Direction::Up,
-          (a, _) => a,
+            (Direction::Left, Direction::Right) => Direction::Right,
+            (Direction::Right, Direction::Left) => Direction::Left,
+            (Direction::Up, Direction::Down) => Direction::Down,
+            (Direction::Down, Direction::Up) => Direction::Up,
+            (a, _) => a,
         };
 
         let head = snake.body[0];
@@ -114,6 +116,7 @@ fn game(window: &Window) {
         let grow = if head.x == apple.x && head.y == apple.y {
             apple = generate_random_point(&mut rng, &window);
             window.mvaddch(apple.y, apple.x, '*');
+            score += 1;
             true
         } else {
             false
@@ -124,6 +127,7 @@ fn game(window: &Window) {
         window.mvaddch(snake.body[0].y, snake.body[0].x, '#');
         thread::sleep(Duration::from_millis(80));
     }
+    score
 }
 
 fn main() {
@@ -131,16 +135,16 @@ fn main() {
     noecho();
     window.refresh();
     'outer: loop {
-        game(&window);
-        window.mvaddstr(window.get_max_y() / 2, window.get_max_x() / 2 - 10, "Game over!");
+        let score = game(&window);
+        window.mvaddstr(window.get_max_y() / 2, window.get_max_x() / 2 - 20, format!("Game over! Your score is: {}", score));
         window.mvaddstr(window.get_max_y() / 2 + 2, window.get_max_x() / 2 - 20, "Would you like to play again? (y/n)");
         window.nodelay(false);
         'inner: loop {
             match window.getch() {
                 Some(input) => {
                     match input {
-                        Input::Character('y') => {break 'inner;},
-                        Input::Character('n') => {break 'outer;},
+                        Input::Character('y') => { break 'inner; }
+                        Input::Character('n') => { break 'outer; }
                         _ => (),
                     }
                 }

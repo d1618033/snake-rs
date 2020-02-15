@@ -132,7 +132,6 @@ fn main() {
     window.refresh();
     'outer: loop {
         game(&window);
-        window.clear();
         window.mvaddstr(window.get_max_y() / 2, window.get_max_x() / 2 - 10, "Game over!");
         window.mvaddstr(window.get_max_y() / 2 + 2, window.get_max_x() / 2 - 20, "Would you like to play again? (y/n)");
         window.nodelay(false);
